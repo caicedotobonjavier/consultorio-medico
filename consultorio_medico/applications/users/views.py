@@ -2,7 +2,9 @@ from django.shortcuts import render
 #
 from rest_framework.generics import CreateAPIView
 #
-from .serializers import UserSerializer
+from rest_framework.views import APIView
+#
+from .serializers import UserSerializer, ValidateCodeSerializer
 #
 from .models import User, VerificationCode
 #
@@ -28,6 +30,7 @@ class CreateUserApiView(CreateAPIView):
         role = serializador.validated_data['role']
         #creo el codigo
         code = create_code()
+
         user = User.objects.create(
             email=email,
             nombre=nombre,
@@ -44,9 +47,30 @@ class CreateUserApiView(CreateAPIView):
         return Response(
             {
                 'response' : "success",
-                'email' : user.email,
+                'user' : user.email,
                 'role' : user.role,
                 'code' : codigo.code
             },
             status=status.HTTP_201_CREATED
+        )
+
+
+class VerficationCodeApiView(CreateAPIView):
+    serializer_class = ValidateCodeSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['id_user'] = self.request.query_params.get('id')
+        return context
+
+    def create(self, request, *args, **kwargs): 
+        serializador = self.get_serializer(data=request.data, )
+        serializador.is_valid(raise_exception=True)
+
+    
+        return Response(
+            {
+                'response' : 'success',
+            },
+            status=status.HTTP_200_OK
         )
