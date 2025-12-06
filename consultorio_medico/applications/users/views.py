@@ -64,13 +64,18 @@ class VerficationCodeApiView(CreateAPIView):
         return context
 
     def create(self, request, *args, **kwargs): 
-        serializador = self.get_serializer(data=request.data, )
+        serializador = self.get_serializer(data=request.data)
         serializador.is_valid(raise_exception=True)
 
+        user = User.objects.get(id=self.request.query_params.get('id'))
+        user.is_active = True
+        user.is_staff = True
+        user.save()
     
         return Response(
             {
                 'response' : 'success',
+                'user_active' : True
             },
             status=status.HTTP_200_OK
         )

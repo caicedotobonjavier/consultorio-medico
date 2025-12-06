@@ -30,10 +30,8 @@ class ValidateCodeSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         user_id = self.context.get('id_user')
-        print(user_id)
-        user = User.objects.filter(id=user_id)
-        user_code = VerificationCode.objects.filter(code=attrs['code'])
-        print(user, user_code)
+        if not VerificationCode.objects.filter(user_id=user_id, code=attrs['code']).exists():
+            raise serializers.ValidationError('El codigo no pertenece al usaurio')        
         return attrs
     
 
