@@ -20,6 +20,26 @@ class UserSerializer(serializers.Serializer):
         help_text = "Roles disponibles: Administrador, Especialista, Medico, Enfermera, Auxiliar, Paciente"
     )
 
+    password = serializers.CharField(
+        help_text = "Ingrese su contraseña",
+        required = True
+    )
+
+    confirm_password = serializers.CharField(
+        help_text = "Confirme su contraseña",
+        required = True
+    )
+
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError('La contraseña debe tener minimo 8 caracteres')
+        return value
+
+    def validate(self, data): 
+        if data['password'] != data['confirm_password']:
+            raise serializers.ValidationError('Las contraseñas no coinciden')
+        return data
+
 
 
 class ValidateCodeSerializer(serializers.Serializer):
@@ -30,7 +50,10 @@ class ValidateCodeSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         user_id = self.context.get('id_user')
-        if not VerificationCode.objects.filter(user_id=user_id, code=attrs['code']).exists():
+        print(user_id)
+        user_update = User.objects.get(id=user_id)
+        print(user_update)
+        if not VerificationCode.objects.filter(user=user_update, code=attrs['code']).exists():
             raise serializers.ValidationError('El codigo no pertenece al usaurio')        
         return attrs
     

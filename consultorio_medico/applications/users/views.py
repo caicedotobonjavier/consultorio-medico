@@ -13,46 +13,46 @@ from .functions import create_code
 from rest_framework.response import Response
 #
 from rest_framework import status
+#
+from .functions import create_user_verification_code
+#
+from django.db import transaction
 # Create your views here.
 
 
-class CreateUserApiView(CreateAPIView):
-    serializer_class = UserSerializer
+class CreateUserApiView(APIView):
 
+    def post(self, request, *args, **kwargs):
+        
+        with transaction.atomic():
+            serializador = UserSerializer(data=request.data)
+            serializador.is_valid(raise_exception=True)
+                
+            email = serializador.validated_data['email']
+            nombre = serializador.validated_data['nombre']
+            apellido = serializador.validated_data['apellido']
+            role = serializador.validated_data['role']
+                
+            user_code = create_user_verification_code(
+                email=email, 
+                nombre=nombre, 
+                apellido=apellido, 
+                role=role
+            )
+            print(user_code.__dict__)
 
-    def create(self, request, *args, **kwargs):
-        serializador = self.serializer_class(data=request.data)
-        serializador.is_valid(raise_exception=True)
-
-        email = serializador.validated_data['email']
-        nombre = serializador.validated_data['nombre']
-        apellido = serializador.validated_data['apellido']
-        role = serializador.validated_data['role']
-        #creo el codigo
-        code = create_code()
-
-        user = User.objects.create(
-            email=email,
-            nombre=nombre,
-            apellido=apellido,
-            role=role,
-        )
-
-        codigo = VerificationCode.objects.create(
-            user = user,
-            code = code
-        )    
-
-
-        return Response(
-            {
-                'response' : "success",
-                'user' : user.email,
-                'role' : user.role,
-                'code' : codigo.code
-            },
-            status=status.HTTP_201_CREATED
-        )
+            return Response(
+                {
+                    'response' : "success",
+                    'user_id' : user_code.user_id,
+                    'user_code' : user_code.code,
+                    'user_email' : User.objects.get(id=user_code.user_id).email,
+                    'activate_user' : 'activa tu usuario en el siguiente link: http://127.0.0.1:8000/user-api/activate-user?id=USER_ID',
+                    'required_data' : '"code" : "your_code"',
+                    'method' : 'POST'
+                },
+                status=status.HTTP_201_CREATED
+            )     
 
 
 class VerficationCodeApiView(CreateAPIView):
@@ -63,11 +63,14 @@ class VerficationCodeApiView(CreateAPIView):
         context['id_user'] = self.request.query_params.get('id')
         return context
 
-    def create(self, request, *args, **kwargs): 
+    def get(self, request, *args, **kwargs): 
         serializador = self.get_serializer(data=request.data)
         serializador.is_valid(raise_exception=True)
 
-        user = User.objects.get(id=self.request.query_params.get('id'))
+        id = self.request.query_params.get('id')
+
+        user = User.objects.get(id=id)
+        print(user)
         user.is_active = True
         user.is_staff = True
         user.save()
@@ -75,7 +78,8 @@ class VerficationCodeApiView(CreateAPIView):
         return Response(
             {
                 'response' : 'success',
-                'user_active' : True
+                'estate_user' : user.is_active
+
             },
             status=status.HTTP_200_OK
         )
