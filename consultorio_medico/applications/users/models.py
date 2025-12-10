@@ -1,10 +1,13 @@
 from django.db import models
+
 #
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 #
 from .managers import UserManager
 #
 from model_utils.models import TimeStampedModel
+#
+from django.db.models.signals import post_save
 # Create your models here.
 
 
@@ -48,3 +51,30 @@ class VerificationCode(TimeStampedModel):
 
     def __str__(self):
         return f'Codigo de {self.user.email}'
+
+
+
+def registrar_medico(sender, instance, created, **kwargs):
+    #
+    from applications.medico.models import Medico
+    #
+    if instance.role == "MEDICO":
+        if created:
+            if not Medico.objects.filter(user=instance).exists():
+                Medico.objects.create(user=instance)
+
+
+post_save.connect(registrar_medico, sender=User)
+
+
+def registrar_paciente(sender, instance, created, **kwargs):
+    #
+    from applications.paciente.models import Paciente
+    #
+    if instance.role == "PAC":
+        if created:
+            if not Paciente.objects.filter(user=instance).exists():
+                Paciente.objects.create(user=instance)
+
+
+post_save.connect(registrar_paciente, sender=User)

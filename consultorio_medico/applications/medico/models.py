@@ -24,7 +24,7 @@ class Especialidad(TimeStampedModel):
 class Medico(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     especialidad = models.ForeignKey(Especialidad, on_delete=models.SET_NULL, null=True)
-    registro_profesional = models.CharField('Registro Profesional', max_length=50)
+    registro_profesional = models.CharField('Registro Profesional', max_length=50, default="Pendiente")
 
 
     class Meta:
@@ -34,4 +34,4 @@ class Medico(TimeStampedModel):
     
 
     def __str__(self):
-        return f'{self.user} {self.especialidad}'
+        return f'{self.user.nombre} {self.user.apellido} - {self.especialidad}'
