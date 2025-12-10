@@ -43,55 +43,57 @@ class CitaSerializer(serializers.Serializer):
     )
 
 
-def validate(self, data):
-    """
-    Validar que no haya colisión de citas considerando la duración
-    """
-    medico = data['medico']
-    fecha_cita = data['fecha_cita']
-    hora_cita = data['hora_cita']
-    
-    # Convertir a datetime para facilitar cálculos
-    cita_inicio = datetime.combine(fecha_cita, hora_cita)
-    cita_duracion = data.get('duracion_minutos', 30)  # Usar valor del campo o 30 por defecto
-    cita_fin = cita_inicio + timedelta(minutes=cita_duracion)
-    
-    # Buscar citas existentes para el mismo médico en esa fecha
-    citas_existentes = Cita.objects.filter(
-        medico=medico,
-        fecha_cita=fecha_cita,
-        estado__in=['AGENDADA', 'COMPLETADA']
-    ).exclude(
-        estado='CANCELADA'  # Excluir citas canceladas
-    )
-    
-    for cita in citas_existentes:
-        cita_existente_inicio = datetime.combine(
-            cita.fecha_cita, 
-            cita.hora_cita
+    def validate(self, data):
+        medico = data['medico']
+        fecha_cita = data['fecha_cita']
+        hora_cita = data['hora_cita']
+
+        # -------------------------
+        # Crear datetime aware
+        # -------------------------
+        cita_inicio = datetime.combine(fecha_cita, hora_cita)
+        if timezone.is_naive(cita_inicio):
+            cita_inicio = timezone.make_aware(cita_inicio)
+
+        # Duración (si no viene en request → 30)
+        cita_duracion = data.get('duracion_minutos', 30)
+        cita_fin = cita_inicio + timedelta(minutes=cita_duracion)
+
+        # -------------------------
+        # Validar colisión con otras citas
+        # -------------------------
+        citas_existentes = Cita.objects.filter(
+            medico=medico,
+            fecha_cita=fecha_cita,
+            estado__in=['AGENDADA', 'COMPLETADA']
         )
-        cita_existente_fin = cita_existente_inicio + timedelta(
-            minutes=cita.duracion_minutos
-        )
-        
-        # Verificar colisión (las citas se solapan)
-        if (cita_inicio < cita_existente_fin and 
-            cita_fin > cita_existente_inicio):
-            
-            hora_existente = cita.hora_cita.strftime('%H:%M')
-            duracion_existente = cita.duracion_minutos
-            
+
+        for cita in citas_existentes:
+            cita_existente_inicio = datetime.combine(cita.fecha_cita, cita.hora_cita)
+            if timezone.is_naive(cita_existente_inicio):
+                cita_existente_inicio = timezone.make_aware(cita_existente_inicio)
+
+            cita_existente_fin = (
+                cita_existente_inicio +
+                timedelta(minutes=cita.duracion_minutos)
+            )
+
+            # Chequeo de solapamiento
+            if cita_inicio < cita_existente_fin and cita_fin > cita_existente_inicio:
+                raise serializers.ValidationError({
+                    'hora_cita': (
+                        f'El médico ya tiene una cita a las '
+                        f'{cita.hora_cita.strftime("%H:%M")} '
+                        f'({cita.duracion_minutos} minutos).'
+                    )
+                })
+
+        # -------------------------
+        # Validación: no permitir citas en el pasado
+        # -------------------------
+        if cita_inicio < timezone.now():
             raise serializers.ValidationError({
-                'hora_cita': f'El médico tiene una cita existente de {duracion_existente} minutos '
-                            f'a las {hora_existente}. '
-                            f'Por favor, seleccione otro horario.'
+                'hora_cita': 'No se puede agendar una cita en el pasado.'
             })
-    
-    # Validación adicional: no permitir citas en el pasado
-    ahora = timezone.now()
-    if datetime.combine(fecha_cita, hora_cita) < ahora:
-        raise serializers.ValidationError({
-            'hora_cita': 'No se puede agendar una cita en el pasado.'
-        })
-    
-    return data
+
+        return data
